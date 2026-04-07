@@ -1,0 +1,189 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ── KERNEL : Tenants ──────────────────────────────────────────────────────────
+
+model Tenant {
+  id          String   @id @default(uuid())
+  slug        String   @unique              // ex: "acme-corp"
+  name        String
+  plan        TenantPlan @default(FREE)
+  isActive    Boolean  @default(true)
+  settings    Json     @default("{}")       // config JSON du tenant
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users           User[]
+  roles           Role[]
+  refreshTokens   RefreshToken[]
+  auditLogs       AuditLog[]
+  tenantModules   TenantModule[]
+
+  @@map("tenants")
+}
+
+enum TenantPlan {
+  FREE
+  STARTER
+  PROFESSIONAL
+  ENTERPRISE
+}
+
+// ── KERNEL : Users ────────────────────────────────────────────────────────────
+
+model User {
+  id           String   @id @default(uuid())
+  tenantId     String
+  email        String
+  passwordHash String
+  firstName    String
+  lastName     String
+  avatar       String?
+  isActive     Boolean  @default(true)
+  isOwner      Boolean  @default(false)    // propriétaire du tenant
+  lastLoginAt  DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userRoles     UserRole[]
+  refreshTokens RefreshToken[]
+  auditLogs     AuditLog[]
+
+  @@unique([tenantId, email])
+  @@map("users")
+}
+
+// ── KERNEL : RBAC ─────────────────────────────────────────────────────────────
+
+model Role {
+  id          String   @id @default(uuid())
+  tenantId    String
+  name        String                        // ex: "Admin", "Vendeur", "Comptable"
+  description String?
+  isSystem    Boolean  @default(false)      // rôle créé par le système (non supprimable)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant      Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userRoles   UserRole[]
+  permissions RolePermission[]
+
+  @@unique([tenantId, name])
+  @@map("roles")
+}
+
+model Permission {
+  id          String   @id @default(uuid())
+  module      String                        // ex: "ventes", "crm", "comptabilite"
+  action      String                        // ex: "READ", "CREATE", "UPDATE", "DELETE", "CONFIRM_ORDER"
+  description String?
+
+  rolePermissions RolePermission[]
+
+  @@unique([module, action])
+  @@map("permissions")
+}
+
+model UserRole {
+  id       String @id @default(uuid())
+  userId   String
+  roleId   String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roleId])
+  @@map("user_roles")
+}
+
+model RolePermission {
+  id           String @id @default(uuid())
+  roleId       String
+  permissionId String
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+// ── KERNEL : Sessions ─────────────────────────────────────────────────────────
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  tenantId  String
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}
+
+// ── KERNEL : Module Registry ──────────────────────────────────────────────────
+
+model Module {
+  id          String   @id                  // ex: "ventes", "crm", "comptabilite"
+  name        String
+  description String?
+  version     String
+  icon        String?
+  category    String
+  isCore      Boolean  @default(false)      // module noyau (non désactivable)
+  dependencies String[] @default([])        // modules requis
+  createdAt   DateTime @default(now())
+
+  tenantModules TenantModule[]
+
+  @@map("modules")
+}
+
+model TenantModule {
+  id          String   @id @default(uuid())
+  tenantId    String
+  moduleId    String
+  isEnabled   Boolean  @default(true)
+  enabledAt   DateTime @default(now())
+  settings    Json     @default("{}")       // config du module pour ce tenant
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  module Module @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, moduleId])
+  @@map("tenant_modules")
+}
+
+// ── KERNEL : Audit ────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  tenantId   String
+  userId     String?
+  module     String
+  action     String
+  entityType String?
+  entityId   String?
+  oldValues  Json?
+  newValues  Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  tenant Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, module, action])
+  @@map("audit_logs")
+}
