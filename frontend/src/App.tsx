@@ -10,9 +10,16 @@ import Register from './pages/Register';
 import AppLayout from './layout/AppLayout';
 import ProtectedRoute from './components/ProtectedRoute';
 import Dashboard from './pages/Dashboard';
-import UsersPage   from './pages/settings/Users';
-import RolesPage   from './pages/settings/Roles';
-import ModulesPage from './pages/settings/Modules';
+import UsersPage    from './pages/settings/Users';
+import RolesPage    from './pages/settings/Roles';
+import ModulesPage  from './pages/settings/Modules';
+import ProductsPage from './pages/settings/Products';
+import Contacts  from './pages/crm/Contacts';
+import Pipeline  from './pages/crm/Pipeline';
+import Quotes    from './pages/ventes/Quotes';
+import Orders    from './pages/ventes/Orders';
+import Invoices  from './pages/ventes/Invoices';
+import WorkflowDesignerPage from './pages/workflow/WorkflowDesignerPage';
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 5 * 60 * 1000, retry: 1 } },
@@ -30,12 +37,22 @@ function AppRouter() {
       <Route path="/" element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard"         element={<Dashboard />} />
+        <Route path="settings"           element={<Navigate to="/settings/users" replace />} />
         <Route path="settings/users"    element={<UsersPage />} />
         <Route path="settings/roles"    element={<RolesPage />} />
         <Route path="settings/modules"  element={<ModulesPage />} />
-        {/* Placeholders pour les modules métier */}
-        <Route path="crm/*"         element={<ComingSoon module="CRM" />} />
-        <Route path="ventes/*"      element={<ComingSoon module="Ventes" />} />
+        <Route path="settings/products" element={<ProductsPage />} />
+        {/* CRM */}
+        <Route path="crm"               element={<Navigate to="/crm/contacts" replace />} />
+        <Route path="crm/contacts"      element={<Contacts />} />
+        <Route path="crm/pipeline"      element={<Pipeline />} />
+        {/* Ventes */}
+        <Route path="ventes"            element={<Navigate to="/ventes/devis" replace />} />
+        <Route path="ventes/devis"      element={<Quotes />} />
+        <Route path="ventes/commandes"  element={<Orders />} />
+        <Route path="ventes/factures"   element={<Invoices />} />
+        {/* Workflow */}
+        <Route path="workflow/designer" element={<WorkflowDesignerPage />} />
         <Route path="achats/*"      element={<ComingSoon module="Achats" />} />
         <Route path="stock/*"       element={<ComingSoon module="Stock" />} />
         <Route path="comptabilite/*"element={<ComingSoon module="Comptabilité" />} />

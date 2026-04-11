@@ -3,7 +3,7 @@ import { Layout, Menu, Avatar, Dropdown, Typography, Badge, Spin } from 'antd';
 import {
   DashboardOutlined, SettingOutlined, TeamOutlined, LogoutOutlined,
   UserOutlined, MenuFoldOutlined, MenuUnfoldOutlined, AppstoreOutlined,
-  BellOutlined,
+  BellOutlined, ApartmentOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -61,6 +61,11 @@ export default function AppLayout() {
         label: c.label,
       })),
     })),
+    {
+      key:   '/workflow/designer',
+      icon:  <ApartmentOutlined />,
+      label: 'Workflow Designer',
+    },
   ];
 
   const userMenuItems = [

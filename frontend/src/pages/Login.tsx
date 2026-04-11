@@ -1,5 +1,5 @@
 import { useState, FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Form, Input, Button, Card, Typography, Alert, Divider } from 'antd';
 import { UserOutlined, LockOutlined, BankOutlined } from '@ant-design/icons';
 import { useAuthStore } from '../store/authStore';
@@ -8,7 +8,9 @@ const { Title, Text } = Typography;
 
 export default function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
   const login    = useAuthStore((s) => s.login);
+  const from     = (location.state as { from?: string })?.from || '/';
   const [error,   setError]   = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -17,7 +19,7 @@ export default function Login() {
     setLoading(true);
     try {
       await login(values.email, values.password, values.tenant);
-      navigate('/');
+      navigate(from, { replace: true });
     } catch (err: any) {
       setError(err?.response?.data?.error || 'Identifiants incorrects');
     } finally {

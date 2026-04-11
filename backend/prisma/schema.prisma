@@ -25,6 +25,21 @@ model Tenant {
   auditLogs       AuditLog[]
   tenantModules   TenantModule[]
 
+  // CRM
+  contacts        Contact[]
+  pipelineStages  PipelineStage[]
+  leads           Lead[]
+
+  // Ventes
+  products        Product[]
+  quotes          Quote[]
+  orders          Order[]
+  invoices        Invoice[]
+
+  // Workflow Engine
+  workflowDefinitions WorkflowDefinition[]
+  workflowInstances   WorkflowInstance[]
+
   @@map("tenants")
 }
 
@@ -55,6 +70,20 @@ model User {
   userRoles     UserRole[]
   refreshTokens RefreshToken[]
   auditLogs     AuditLog[]
+
+  // CRM
+  contactsAssigned  Contact[]      @relation("ContactAssignee")
+  contactsCreated   Contact[]      @relation("ContactCreator")
+  leadsAssigned     Lead[]         @relation("LeadAssignee")
+  leadsCreated      Lead[]         @relation("LeadCreator")
+  leadActivities    LeadActivity[]
+
+  // Ventes
+  quotesAssigned    Quote[]        @relation("QuoteAssignee")
+  quotesCreated     Quote[]        @relation("QuoteCreator")
+  ordersAssigned    Order[]        @relation("OrderAssignee")
+  ordersCreated     Order[]        @relation("OrderCreator")
+  invoicesCreated   Invoice[]      @relation("InvoiceCreator")
 
   @@unique([tenantId, email])
   @@map("users")
@@ -186,4 +215,472 @@ model AuditLog {
   @@index([tenantId, createdAt])
   @@index([tenantId, module, action])
   @@map("audit_logs")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MODULE CRM
+// ═══════════════════════════════════════════════════════════════════════════════
+
+model Contact {
+  id           String   @id @default(uuid())
+  tenantId     String
+  firstName    String
+  lastName     String
+  email        String?
+  phone        String?
+  mobile       String?
+  company      String?
+  jobTitle     String?
+  source       ContactSource @default(MANUAL)
+  tags         String[] @default([])
+  street       String?
+  city         String?
+  country      String?
+  notes        String?
+  isActive     Boolean  @default(true)
+  assignedToId String?
+  createdById  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tenant     Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  assignedTo User?   @relation("ContactAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  createdBy  User?   @relation("ContactCreator",  fields: [createdById],  references: [id], onDelete: SetNull)
+  leads      Lead[]
+  quotes     Quote[]
+  orders     Order[]   @relation("OrderContact")
+  invoices   Invoice[] @relation("InvoiceContact")
+
+  @@index([tenantId])
+  @@index([tenantId, email])
+  @@map("crm_contacts")
+}
+
+enum ContactSource {
+  MANUAL
+  WEBSITE
+  REFERRAL
+  LINKEDIN
+  EMAIL_CAMPAIGN
+  PHONE
+  OTHER
+}
+
+model PipelineStage {
+  id       String @id @default(uuid())
+  tenantId String
+  name     String
+  color    String @default("#1677ff")
+  order    Int    @default(0)
+  probability Int @default(0)  // % de chance de gagner
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  leads  Lead[]
+
+  @@index([tenantId])
+  @@map("crm_pipeline_stages")
+}
+
+model Lead {
+  id           String     @id @default(uuid())
+  tenantId     String
+  title        String
+  contactId    String?
+  stageId      String
+  status       LeadStatus @default(OPEN)
+  value        Decimal?   @db.Decimal(15, 2)
+  probability  Int        @default(0)
+  currency     String     @default("MAD")
+  expectedDate DateTime?
+  assignedToId String?
+  createdById  String?
+  description  String?
+  lostReason   String?
+  wonAt        DateTime?
+  lostAt       DateTime?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  tenant     Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  contact    Contact?       @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  stage      PipelineStage  @relation(fields: [stageId], references: [id])
+  assignedTo User?          @relation("LeadAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  createdBy  User?          @relation("LeadCreator",  fields: [createdById],  references: [id], onDelete: SetNull)
+  activities LeadActivity[]
+
+  @@index([tenantId])
+  @@index([tenantId, stageId])
+  @@map("crm_leads")
+}
+
+enum LeadStatus {
+  OPEN
+  WON
+  LOST
+  CANCELLED
+}
+
+model LeadActivity {
+  id        String           @id @default(uuid())
+  leadId    String
+  userId    String?
+  type      LeadActivityType
+  content   String
+  createdAt DateTime         @default(now())
+
+  lead Lead  @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([leadId])
+  @@map("crm_lead_activities")
+}
+
+enum LeadActivityType {
+  NOTE
+  CALL
+  EMAIL
+  MEETING
+  STAGE_CHANGE
+  STATUS_CHANGE
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MODULE VENTES
+// ═══════════════════════════════════════════════════════════════════════════════
+
+model Product {
+  id          String  @id @default(uuid())
+  tenantId    String
+  reference   String
+  name        String
+  description String?
+  unitPrice   Decimal @db.Decimal(15, 2) @default(0)
+  unit        String  @default("unité")
+  taxRate     Decimal @db.Decimal(5, 2)  @default(20)
+  category    String?
+  isActive    Boolean @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant     Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  quoteLines QuoteLine[]
+  orderLines OrderLine[]
+
+  @@unique([tenantId, reference])
+  @@index([tenantId])
+  @@map("ventes_products")
+}
+
+model Quote {
+  id           String      @id @default(uuid())
+  tenantId     String
+  reference    String
+  contactId    String?
+  status       QuoteStatus @default(DRAFT)
+  issueDate    DateTime    @default(now())
+  expiryDate   DateTime?
+  currency     String      @default("MAD")
+  notes        String?
+  termsAndCond String?
+  subtotal     Decimal     @db.Decimal(15, 2) @default(0)
+  taxAmount    Decimal     @db.Decimal(15, 2) @default(0)
+  total        Decimal     @db.Decimal(15, 2) @default(0)
+  assignedToId String?
+  createdById  String?
+  confirmedAt  DateTime?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  tenant     Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  contact    Contact?    @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  assignedTo User?       @relation("QuoteAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  createdBy  User?       @relation("QuoteCreator",  fields: [createdById],  references: [id], onDelete: SetNull)
+  lines      QuoteLine[]
+  order      Order?      @relation("QuoteOrder")
+
+  @@unique([tenantId, reference])
+  @@index([tenantId])
+  @@map("ventes_quotes")
+}
+
+enum QuoteStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  REFUSED
+  EXPIRED
+}
+
+model QuoteLine {
+  id          String  @id @default(uuid())
+  quoteId     String
+  productId   String?
+  description String
+  quantity    Decimal @db.Decimal(10, 3) @default(1)
+  unitPrice   Decimal @db.Decimal(15, 2)
+  taxRate     Decimal @db.Decimal(5, 2)  @default(20)
+  subtotal    Decimal @db.Decimal(15, 2) @default(0)
+  taxAmount   Decimal @db.Decimal(15, 2) @default(0)
+  total       Decimal @db.Decimal(15, 2) @default(0)
+  sortOrder   Int     @default(0)
+
+  quote   Quote    @relation(fields: [quoteId],   references: [id], onDelete: Cascade)
+  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([quoteId])
+  @@map("ventes_quote_lines")
+}
+
+model Order {
+  id           String      @id @default(uuid())
+  tenantId     String
+  reference    String
+  quoteId      String?     @unique
+  contactId    String?
+  status       OrderStatus @default(CONFIRMED)
+  orderDate    DateTime    @default(now())
+  deliveryDate DateTime?
+  currency     String      @default("MAD")
+  notes        String?
+  subtotal     Decimal     @db.Decimal(15, 2) @default(0)
+  taxAmount    Decimal     @db.Decimal(15, 2) @default(0)
+  total        Decimal     @db.Decimal(15, 2) @default(0)
+  assignedToId String?
+  createdById  String?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  tenant     Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  contact    Contact?    @relation("OrderContact", fields: [contactId], references: [id], onDelete: SetNull)
+  quote      Quote?      @relation("QuoteOrder",   fields: [quoteId],   references: [id], onDelete: SetNull)
+  assignedTo User?       @relation("OrderAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  createdBy  User?       @relation("OrderCreator",  fields: [createdById],  references: [id], onDelete: SetNull)
+  lines      OrderLine[]
+  invoices   Invoice[]
+
+  @@unique([tenantId, reference])
+  @@index([tenantId])
+  @@map("ventes_orders")
+}
+
+enum OrderStatus {
+  CONFIRMED
+  IN_PROGRESS
+  DELIVERED
+  CANCELLED
+}
+
+model OrderLine {
+  id          String  @id @default(uuid())
+  orderId     String
+  productId   String?
+  description String
+  quantity    Decimal @db.Decimal(10, 3) @default(1)
+  unitPrice   Decimal @db.Decimal(15, 2)
+  taxRate     Decimal @db.Decimal(5, 2)  @default(20)
+  subtotal    Decimal @db.Decimal(15, 2) @default(0)
+  taxAmount   Decimal @db.Decimal(15, 2) @default(0)
+  total       Decimal @db.Decimal(15, 2) @default(0)
+  sortOrder   Int     @default(0)
+
+  order   Order    @relation(fields: [orderId],   references: [id], onDelete: Cascade)
+  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([orderId])
+  @@map("ventes_order_lines")
+}
+
+model Invoice {
+  id           String        @id @default(uuid())
+  tenantId     String
+  reference    String
+  orderId      String?
+  contactId    String?
+  status       InvoiceStatus @default(DRAFT)
+  issueDate    DateTime      @default(now())
+  dueDate      DateTime?
+  currency     String        @default("MAD")
+  notes        String?
+  subtotal     Decimal       @db.Decimal(15, 2) @default(0)
+  taxAmount    Decimal       @db.Decimal(15, 2) @default(0)
+  total        Decimal       @db.Decimal(15, 2) @default(0)
+  paidAmount   Decimal       @db.Decimal(15, 2) @default(0)
+  createdById  String?
+  sentAt       DateTime?
+  paidAt       DateTime?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  tenant    Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  contact   Contact?      @relation("InvoiceContact", fields: [contactId], references: [id], onDelete: SetNull)
+  order     Order?        @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  createdBy User?         @relation("InvoiceCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  lines     InvoiceLine[]
+
+  @@unique([tenantId, reference])
+  @@index([tenantId])
+  @@map("ventes_invoices")
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  PARTIALLY_PAID
+  OVERDUE
+  CANCELLED
+}
+
+model InvoiceLine {
+  id          String  @id @default(uuid())
+  invoiceId   String
+  description String
+  quantity    Decimal @db.Decimal(10, 3) @default(1)
+  unitPrice   Decimal @db.Decimal(15, 2)
+  taxRate     Decimal @db.Decimal(5, 2)  @default(20)
+  subtotal    Decimal @db.Decimal(15, 2) @default(0)
+  taxAmount   Decimal @db.Decimal(15, 2) @default(0)
+  total       Decimal @db.Decimal(15, 2) @default(0)
+  sortOrder   Int     @default(0)
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+  @@map("ventes_invoice_lines")
+}
+
+// ── KERNEL : Workflow Engine ──────────────────────────────────────────────────
+// Domain-agnostic state machine engine.
+// Definitions are stored in DB → zero redeploy for config changes.
+
+// The blueprint: states + transitions for one entity type in one tenant.
+model WorkflowDefinition {
+  id           String   @id @default(uuid())
+  tenantId     String
+  name         String                          // ex: "Cycle de vie devis"
+  entityType   String                          // ex: "quote" | "order" | "leave_request"
+  version      Int      @default(1)
+  isActive     Boolean  @default(true)
+  description  String?
+  initialState String                          // key of the starting state
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tenant      Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  states      WorkflowState[]
+  transitions WorkflowTransition[]
+  instances   WorkflowInstance[]
+
+  @@unique([tenantId, entityType, version])
+  @@index([tenantId])
+  @@map("wf_definitions")
+}
+
+// One node of the state machine.
+model WorkflowState {
+  id           String  @id @default(uuid())
+  definitionId String
+  key          String                         // machine key: "draft", "sent", "paid"
+  label        String                         // display label: "Brouillon", "Envoyé"
+  isInitial    Boolean @default(false)
+  isFinal      Boolean @default(false)
+  color        String?                        // hex color for UI badges
+  metadata     Json    @default("{}")         // arbitrary UI hints
+
+  definition WorkflowDefinition @relation(fields: [definitionId], references: [id], onDelete: Cascade)
+
+  @@unique([definitionId, key])
+  @@map("wf_states")
+}
+
+// One allowed state change, with guard conditions and side-effect actions.
+model WorkflowTransition {
+  id                 String  @id @default(uuid())
+  definitionId       String
+  key                String                         // machine key: "send", "confirm", "pay"
+  label              String                         // display label: "Envoyer", "Confirmer"
+  fromStateKey       String                         // source state key (not FK — validated at app layer)
+  toStateKey         String                         // target state key
+  requiredPermission String?                        // "module:ACTION" — null means any auth user
+  sortOrder          Int     @default(0)
+
+  definition WorkflowDefinition      @relation(fields: [definitionId], references: [id], onDelete: Cascade)
+  conditions WorkflowConditionConfig[]
+  actions    WorkflowActionConfig[]
+
+  @@unique([definitionId, key])
+  @@map("wf_transitions")
+}
+
+// Guard: a pluggable condition that must pass before the transition fires.
+model WorkflowConditionConfig {
+  id           String @id @default(uuid())
+  transitionId String
+  type         String                         // "field_not_empty" | "field_comparison" | "state_match"
+  config       Json                           // type-specific config (see ConditionEvaluator docs)
+  sortOrder    Int    @default(0)
+
+  transition WorkflowTransition @relation(fields: [transitionId], references: [id], onDelete: Cascade)
+
+  @@map("wf_condition_configs")
+}
+
+// Effect: a pluggable action executed atomically with the transition.
+model WorkflowActionConfig {
+  id           String @id @default(uuid())
+  transitionId String
+  type         String                         // "set_field" | "emit_event" | "webhook"
+  config       Json                           // type-specific config (see ActionExecutor docs)
+  sortOrder    Int    @default(0)
+
+  transition WorkflowTransition @relation(fields: [transitionId], references: [id], onDelete: Cascade)
+
+  @@map("wf_action_configs")
+}
+
+// Runtime: tracks the current state of one specific entity.
+model WorkflowInstance {
+  id              String   @id @default(uuid())
+  tenantId        String
+  definitionId    String
+  entityType      String
+  entityId        String
+  currentStateKey String
+  metadata        Json     @default("{}")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant     Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  definition WorkflowDefinition @relation(fields: [definitionId], references: [id])
+  logs       WorkflowExecutionLog[]
+
+  @@unique([tenantId, entityType, entityId])
+  @@index([tenantId])
+  @@map("wf_instances")
+}
+
+// Immutable audit record for every transition attempt (success or failure).
+model WorkflowExecutionLog {
+  id            String   @id @default(uuid())
+  instanceId    String
+  tenantId      String
+  transitionKey String
+  fromState     String
+  toState       String
+  userId        String?
+  payload       Json     @default("{}")   // extra data from the caller
+  actionsRun    Json     @default("[]")  // list of action types executed
+  durationMs    Int?
+  success       Boolean  @default(true)
+  errorMessage  String?
+
+  createdAt DateTime @default(now())
+
+  instance WorkflowInstance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+
+  @@index([instanceId])
+  @@index([tenantId])
+  @@map("wf_execution_logs")
 }

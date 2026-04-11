@@ -77,8 +77,11 @@ registry.register({
   category: 'system', dependencies: [],
   routes: [],
   menuItems: [
-    { key: 'settings', label: 'Paramètres', icon: 'SettingOutlined', path: '/settings', order: 900 },
-    { key: 'users',    label: 'Utilisateurs', icon: 'TeamOutlined',   path: '/settings/users', order: 910 },
+    { key: 'settings', label: 'Paramètres',         icon: 'SettingOutlined',  path: '/settings',          order: 900 },
+    { key: 'users',    label: 'Utilisateurs',        icon: 'TeamOutlined',     path: '/settings/users',    order: 910 },
+    { key: 'roles',    label: 'Rôles',               icon: 'SafetyOutlined',   path: '/settings/roles',    order: 911 },
+    { key: 'modules',  label: 'Modules',             icon: 'AppstoreOutlined', path: '/settings/modules',  order: 912 },
+    { key: 'products', label: 'Produits & Services', icon: 'ShopOutlined',     path: '/settings/products', order: 913 },
   ],
   permissions: [
     { module: 'kernel', action: 'MANAGE_USERS',   description: 'Gérer les utilisateurs' },
@@ -92,10 +95,9 @@ registry.register({
   category: 'business', dependencies: ['kernel'],
   routes: [],
   menuItems: [
-    { key: 'crm',         label: 'CRM',          icon: 'TeamOutlined',    path: '/crm', order: 100 },
-    { key: 'contacts',    label: 'Contacts',      icon: 'ContactsOutlined',path: '/crm/contacts', order: 101 },
-    { key: 'leads',       label: 'Leads',         icon: 'FunnelPlotOutlined', path: '/crm/leads', order: 102 },
-    { key: 'opportunites',label: 'Opportunités',  icon: 'TrophyOutlined',  path: '/crm/opportunities', order: 103 },
+    { key: 'crm',      label: 'CRM',      icon: 'TeamOutlined',       path: '/crm', order: 100 },
+    { key: 'contacts', label: 'Contacts', icon: 'ContactsOutlined',   path: '/crm/contacts', order: 101 },
+    { key: 'pipeline', label: 'Pipeline', icon: 'FunnelPlotOutlined', path: '/crm/pipeline', order: 102 },
   ],
   permissions: [
     { module: 'crm', action: 'READ',   description: 'Lire les données CRM' },

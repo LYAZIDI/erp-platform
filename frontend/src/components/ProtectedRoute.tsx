@@ -1,11 +1,12 @@
 import { ReactNode } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { Spin } from 'antd';
 import { useAuthStore } from '../store/authStore';
 
 export default function ProtectedRoute({ children }: { children: ReactNode }) {
-  const user    = useAuthStore((s) => s.user);
-  const loading = useAuthStore((s) => s.loading);
+  const user     = useAuthStore((s) => s.user);
+  const loading  = useAuthStore((s) => s.loading);
+  const location = useLocation();
 
   if (loading) {
     return (
@@ -15,6 +16,6 @@ export default function ProtectedRoute({ children }: { children: ReactNode }) {
     );
   }
 
-  if (!user) return <Navigate to="/login" replace />;
+  if (!user) return <Navigate to="/login" state={{ from: location.pathname }} replace />;
   return <>{children}</>;
 }
