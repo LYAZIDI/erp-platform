@@ -69,7 +69,12 @@ app.use('/api/ventes/invoices',   invoiceRoutes);
 app.use('/api/workflow',          workflowRoutes);
 
 // ── Health check ──────────────────────────────────────────────────────────────
-app.get('/health', (_req, res) => res.json({ status: 'ok', version: '1.0.0', env: process.env.NODE_ENV }));
+app.get('/health', (_req, res) => res.json({
+  status: 'ok',
+  version: '1.0.0',
+  env: process.env.NODE_ENV,
+  db: !!process.env.DATABASE_URL ? 'configured' : 'MISSING',
+}));
 
 // ── 404 ───────────────────────────────────────────────────────────────────────
 app.use((_req, res) => res.status(404).json({ error: 'Route introuvable' }));
@@ -78,7 +83,7 @@ app.use((_req, res) => res.status(404).json({ error: 'Route introuvable' }));
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   console.error('[ERROR]', err);
   const status  = err.statusCode || err.status || 500;
-  const message = process.env.NODE_ENV === 'production' ? 'Erreur interne' : err.message;
+  const message = err.message; // temporaire pour diagnostic
   res.status(status).json({ error: message });
 });
 
