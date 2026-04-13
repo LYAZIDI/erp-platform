@@ -62,6 +62,7 @@ router.post('/login', async (req, res) => {
 
 // ── POST /api/auth/register (crée un nouveau tenant + owner) ─────────────────
 router.post('/register', async (req, res) => {
+  try {
   const body = registerSchema.safeParse(req.body);
   if (!body.success) return res.status(400).json({ error: 'Données invalides', details: body.error.flatten() });
 
@@ -131,6 +132,14 @@ router.post('/register', async (req, res) => {
   } catch (err: any) {
     if (err.code === 'P2002') return res.status(409).json({ error: 'Cet email est déjà utilisé' });
     throw err;
+  }
+  } catch (err: any) {
+    // Debug: catch all errors directly in route
+    return res.status(500).json({
+      error: err?.message || 'unknown',
+      code: err?.code,
+      type: err?.constructor?.name,
+    });
   }
 });
 
