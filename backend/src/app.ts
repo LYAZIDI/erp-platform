@@ -70,7 +70,7 @@ app.use('/api/workflow',          workflowRoutes);
 
 // ── Health check ──────────────────────────────────────────────────────────────
 // Public health check — also accessible at /api/health via Vercel routing
-app.get('/api/health', (_req, res) => res.json({
+app.get(['/health', '/api/health'], (_req, res) => res.json({
   status: 'ok',
   version: '1.0.0',
   env: process.env.NODE_ENV,
