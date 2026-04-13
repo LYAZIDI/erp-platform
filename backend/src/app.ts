@@ -69,11 +69,13 @@ app.use('/api/ventes/invoices',   invoiceRoutes);
 app.use('/api/workflow',          workflowRoutes);
 
 // ── Health check ──────────────────────────────────────────────────────────────
-app.get('/health', (_req, res) => res.json({
+// Public health check — also accessible at /api/health via Vercel routing
+app.get('/api/health', (_req, res) => res.json({
   status: 'ok',
   version: '1.0.0',
   env: process.env.NODE_ENV,
-  db: !!process.env.DATABASE_URL ? 'configured' : 'MISSING',
+  db:  process.env.DATABASE_URL  ? 'configured' : 'MISSING',
+  jwt: process.env.JWT_ACCESS_SECRET ? 'configured' : 'using default (change in prod)',
 }));
 
 // ── 404 ───────────────────────────────────────────────────────────────────────
