@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "concurrently \"npm run dev --workspace=backend\" \"npm run dev --workspace=frontend\"",
     "build": "npm run build --workspace=backend && npm run build --workspace=frontend",
-    "vercel-build": "npm install --workspace=backend && npm run db:generate --workspace=backend && npm install --workspace=frontend && npm run build --workspace=frontend"
+    "vercel-build": "npm run vercel-build --workspace=backend && npm run vercel-build --workspace=frontend"
   },
   "devDependencies": {
     "concurrently": "^9.0.0"
