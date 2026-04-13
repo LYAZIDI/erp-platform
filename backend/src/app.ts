@@ -85,8 +85,7 @@ app.use((_req, res) => res.status(404).json({ error: 'Route introuvable' }));
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   console.error('[ERROR]', err);
   const status  = err.statusCode || err.status || 500;
-  const message = err.message; // temporaire pour diagnostic
-  res.status(status).json({ error: message });
+  res.status(status).json({ error: err.message, code: err.code, stack: err.stack?.split('\n').slice(0,3) });
 });
 
 export default app;
