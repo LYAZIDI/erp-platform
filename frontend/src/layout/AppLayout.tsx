@@ -65,6 +65,7 @@ export default function AppLayout() {
       key:   '/workflow/designer',
       icon:  <ApartmentOutlined />,
       label: 'Workflow Designer',
+      // v2
     },
   ];
 
