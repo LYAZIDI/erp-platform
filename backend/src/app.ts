@@ -79,7 +79,7 @@ app.get('/api/health', (_req, res) => {
 app.get('/api/ping', (_req, res) => res.json({ pong: true }));
 
 // ── 404 ───────────────────────────────────────────────────────────────────────
-app.use((_req, res) => res.status(404).json({ error: 'Route introuvable' }));
+app.use((req, res) => res.status(404).json({ error: 'Route introuvable', path: req.path, url: req.url, method: req.method }));
 
 // ── Error handler ─────────────────────────────────────────────────────────────
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
