@@ -69,7 +69,8 @@ app.use('/api/ventes/invoices',   invoiceRoutes);
 app.use('/api/workflow',          workflowRoutes);
 
 // ── Health / ping ────────────────────────────────────────────────────────────
-app.get('/api/ping',   (_req, res) => res.json({ pong: true }));
+app.get('/api/ping',   (_req, res) => res.json({ pong: true, v: 15 }));
+app.get('/ping',       (_req, res) => res.json({ pong: true, v: 15, note: 'no api prefix' }));
 app.get('/api/health', (_req, res) => res.json({
   status: 'ok',
   env: process.env.NODE_ENV,
