@@ -12,50 +12,36 @@ import { WorkflowCanvas } from './components/WorkflowCanvas';
 import { apiToGraph } from './mappers/apiToGraph';
 import { graphToApi } from './mappers/graphToApi';
 import type { ApiWorkflowDefinition } from './types';
+import api from '../../api/client';
 
 const { Header, Content } = Layout;
-const { Text, Title } = Typography;
+const { Text } = Typography;
 
-// ── API helpers ──────────────────────────────────────────────────────────────
+// ── API helpers (uses shared axios client — token handled automatically) ───────
 
-async function fetchDefinitions(entityType: string): Promise<ApiWorkflowDefinition[]> {
-  const params = entityType ? `?entityType=${encodeURIComponent(entityType)}` : '';
-  const res = await fetch(`/wf-api/workflow-definitions${params}`, {
-    headers: { Authorization: `Bearer ${localStorage.getItem('token') || ''}` },
-  });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
+async function fetchDefinitions(): Promise<ApiWorkflowDefinition[]> {
+  return api.get('/workflow/definitions') as Promise<ApiWorkflowDefinition[]>;
 }
 
-async function saveDefinition(payload: Omit<ApiWorkflowDefinition, 'isActive'>): Promise<ApiWorkflowDefinition> {
-  const url = payload.id
-    ? `/wf-api/workflow-definitions/${payload.id}`
-    : '/wf-api/workflow-definitions';
-  const method = payload.id ? 'PUT' : 'POST';
-  const res = await fetch(url, {
-    method,
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${localStorage.getItem('token') || ''}`,
-    },
-    body: JSON.stringify(payload),
-  });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(text || `HTTP ${res.status}`);
+async function fetchDefinition(id: string): Promise<ApiWorkflowDefinition> {
+  return api.get(`/workflow/definitions/${id}`) as Promise<ApiWorkflowDefinition>;
+}
+
+async function saveDefinition(
+  payload: ReturnType<typeof graphToApi>,
+  id?: string | null
+): Promise<ApiWorkflowDefinition> {
+  if (id) {
+    return api.put(`/workflow/definitions/${id}`, payload) as Promise<ApiWorkflowDefinition>;
   }
-  return res.json();
+  return api.post('/workflow/definitions', payload) as Promise<ApiWorkflowDefinition>;
 }
 
 async function deleteDefinition(id: string): Promise<void> {
-  const res = await fetch(`/wf-api/workflow-definitions/${id}`, {
-    method: 'DELETE',
-    headers: { Authorization: `Bearer ${localStorage.getItem('token') || ''}` },
-  });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  await api.delete(`/workflow/definitions/${id}`);
 }
 
-// ── Component ────────────────────────────────────────────────────────────────
+// ── Component ─────────────────────────────────────────────────────────────────
 
 export default function WorkflowDesignerPage() {
   const [msg, ctxHolder] = message.useMessage();
@@ -63,37 +49,61 @@ export default function WorkflowDesignerPage() {
   const nodes    = useDesignerStore(s => s.nodes);
   const edges    = useDesignerStore(s => s.edges);
   const meta     = useDesignerStore(s => s.meta);
-  const isDirty  = useDesignerStore(s => s.isSaving);
   const isSaving = useDesignerStore(s => s.isSaving);
   const validationIssues = useDesignerStore(s => s.validationIssues);
-  const { updateMeta, loadGraph, resetGraph, setIsSaving, setSaveError, markSaved } = useDesignerStore.getState();
+  const { updateMeta, loadGraph, resetGraph, setIsSaving, setSaveError, markSaved } =
+    useDesignerStore.getState();
 
-  const [listOpen, setListOpen]     = useState(false);
-  const [listLoading, setListLoading] = useState(false);
-  const [definitions, setDefinitions] = useState<ApiWorkflowDefinition[]>([]);
-  const [filterEntity, setFilterEntity] = useState('');
+  const [listOpen, setListOpen]         = useState(false);
+  const [listLoading, setListLoading]   = useState(false);
+  const [definitions, setDefinitions]   = useState<ApiWorkflowDefinition[]>([]);
+  const [allDefinitions, setAllDefinitions] = useState<ApiWorkflowDefinition[]>([]);
+  const [filterText, setFilterText]     = useState('');
 
   const hasErrors = validationIssues.some(i => i.level === 'error');
 
-  // ── Load list ──────────────────────────────────────────────────────────────
+  // ── Open list ──────────────────────────────────────────────────────────────
   const openList = useCallback(async () => {
     setListOpen(true);
     setListLoading(true);
     try {
-      const defs = await fetchDefinitions(filterEntity);
-      setDefinitions(defs);
-    } catch (e: unknown) {
+      const defs = await fetchDefinitions();
+      console.log('[WorkflowDesigner] defs:', defs);
+      const list = Array.isArray(defs) ? defs : [];
+      setAllDefinitions(list);
+      setDefinitions(list);
+      setFilterText('');
+    } catch (err) {
+      console.error('[WorkflowDesigner] error:', err);
       msg.error('Impossible de charger les définitions');
     } finally {
       setListLoading(false);
     }
-  }, [filterEntity, msg]);
+  }, [msg]);
 
-  const handleLoadDef = useCallback((def: ApiWorkflowDefinition) => {
-    const { meta: m, nodes: n, edges: e } = apiToGraph(def);
-    loadGraph(n, e, m);
-    setListOpen(false);
-    msg.success(`Workflow "${def.label}" chargé`);
+  const handleFilterChange = useCallback((value: string) => {
+    setFilterText(value);
+    const q = value.toLowerCase().trim();
+    if (!q) {
+      setDefinitions(allDefinitions);
+    } else {
+      setDefinitions(allDefinitions.filter(d =>
+        d.name.toLowerCase().includes(q) || d.entityType.toLowerCase().includes(q)
+      ));
+    }
+  }, [allDefinitions]);
+
+  const handleLoadDef = useCallback(async (def: ApiWorkflowDefinition) => {
+    try {
+      // Fetch full definition (list endpoint only returns counts, not full states/transitions)
+      const full = await fetchDefinition(def.id);
+      const { meta: m, nodes: n, edges: e } = apiToGraph(full);
+      loadGraph(n, e, m);
+      setListOpen(false);
+      msg.success(`Workflow "${def.name}" chargé`);
+    } catch {
+      msg.error('Erreur lors du chargement');
+    }
   }, [loadGraph, msg]);
 
   const handleDeleteDef = useCallback(async (def: ApiWorkflowDefinition) => {
@@ -113,11 +123,11 @@ export default function WorkflowDesignerPage() {
       return;
     }
     if (!meta.entityType.trim()) {
-      msg.error('Le type d\'entité est requis');
+      msg.error("Le type d'entité est requis");
       return;
     }
     if (!meta.label.trim()) {
-      msg.error('Le libellé du workflow est requis');
+      msg.error('Le nom du workflow est requis');
       return;
     }
 
@@ -125,15 +135,16 @@ export default function WorkflowDesignerPage() {
     setSaveError(null);
     try {
       const payload = graphToApi(nodes, edges, meta);
-      const saved   = await saveDefinition(payload);
-      const { meta: m, nodes: n, edges: e } = apiToGraph(saved);
+      const saved   = await saveDefinition(payload, meta.definitionId);
+      const full    = await fetchDefinition(saved.id);
+      const { meta: m, nodes: n, edges: e } = apiToGraph(full);
       loadGraph(n, e, m);
       markSaved();
-      msg.success('Workflow sauvegardé avec succès');
+      msg.success('Workflow sauvegardé');
     } catch (err: unknown) {
       const errMsg = err instanceof Error ? err.message : 'Erreur inconnue';
       setSaveError(errMsg);
-      msg.error(`Erreur: ${errMsg}`);
+      msg.error(`Erreur : ${errMsg}`);
     } finally {
       setIsSaving(false);
     }
@@ -149,7 +160,7 @@ export default function WorkflowDesignerPage() {
     <Layout style={{ height: 'calc(100vh - 112px)', borderRadius: 8, overflow: 'hidden', border: '1px solid #e5e7eb' }}>
       {ctxHolder}
 
-      {/* ── Toolbar Header ─────────────────────────────────────────────────── */}
+      {/* ── Toolbar ────────────────────────────────────────────────────────── */}
       <Header style={{
         background: '#fff',
         borderBottom: '1px solid #e5e7eb',
@@ -159,7 +170,6 @@ export default function WorkflowDesignerPage() {
         alignItems: 'center',
         gap: 12,
       }}>
-        {/* Meta fields */}
         <Space size={8} style={{ flex: 1 }}>
           <Input
             placeholder="Type d'entité (ex: lead)"
@@ -169,7 +179,7 @@ export default function WorkflowDesignerPage() {
             size="small"
           />
           <Input
-            placeholder="Libellé du workflow"
+            placeholder="Nom du workflow"
             value={meta.label}
             onChange={e => updateMeta({ label: e.target.value })}
             style={{ width: 220 }}
@@ -189,20 +199,17 @@ export default function WorkflowDesignerPage() {
           )}
         </Space>
 
-        {/* Actions */}
         <Space size={8}>
           <Tooltip title="Nouveau workflow">
             <Button icon={<PlusOutlined />} size="small" onClick={handleNew}>
               Nouveau
             </Button>
           </Tooltip>
-
           <Tooltip title="Ouvrir un workflow existant">
             <Button icon={<FolderOpenOutlined />} size="small" onClick={openList}>
               Ouvrir
             </Button>
           </Tooltip>
-
           <Tooltip title={hasErrors ? 'Erreurs de validation — sauvegarde impossible' : 'Sauvegarder'}>
             <Button
               icon={<SaveOutlined />}
@@ -217,7 +224,6 @@ export default function WorkflowDesignerPage() {
           </Tooltip>
         </Space>
 
-        {/* Validation indicator */}
         {validationIssues.length > 0 ? (
           <Tooltip title={validationIssues.map(i => i.message).join('\n')}>
             <ExclamationCircleOutlined
@@ -242,12 +248,14 @@ export default function WorkflowDesignerPage() {
         width={440}
         extra={
           <Space>
-            <Input
-              placeholder="Filtrer par type d'entité"
-              value={filterEntity}
-              onChange={e => setFilterEntity(e.target.value)}
+            <Input.Search
+              placeholder="Rechercher par nom ou type…"
+              value={filterText}
+              onChange={e => handleFilterChange(e.target.value)}
+              onSearch={handleFilterChange}
+              allowClear
               size="small"
-              style={{ width: 180 }}
+              style={{ width: 200 }}
             />
             <Button size="small" onClick={openList}>Rafraîchir</Button>
           </Space>
@@ -264,12 +272,7 @@ export default function WorkflowDesignerPage() {
               <List.Item
                 key={def.id}
                 actions={[
-                  <Button
-                    key="load"
-                    type="primary"
-                    size="small"
-                    onClick={() => handleLoadDef(def)}
-                  >
+                  <Button key="load" type="primary" size="small" onClick={() => handleLoadDef(def)}>
                     Charger
                   </Button>,
                   <Popconfirm
@@ -286,7 +289,7 @@ export default function WorkflowDesignerPage() {
                 <List.Item.Meta
                   title={
                     <Space>
-                      <Text strong>{def.label}</Text>
+                      <Text strong>{def.name}</Text>
                       <Tag color="geekblue">{def.entityType}</Tag>
                       <Tag>v{def.version}</Tag>
                       {def.isActive
@@ -297,8 +300,8 @@ export default function WorkflowDesignerPage() {
                   }
                   description={
                     <Text type="secondary" style={{ fontSize: 11 }}>
-                      {def.states.length} état{def.states.length > 1 ? 's' : ''} ·{' '}
-                      {def.transitions.length} transition{def.transitions.length > 1 ? 's' : ''}
+                      {def._count?.states ?? def.states?.length ?? 0} état(s) ·{' '}
+                      {def._count?.transitions ?? def.transitions?.length ?? 0} transition(s)
                     </Text>
                   }
                 />
