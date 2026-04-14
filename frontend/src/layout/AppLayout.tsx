@@ -52,6 +52,11 @@ export default function AppLayout() {
       icon:  <DashboardOutlined />,
       label: 'Tableau de bord',
     },
+    {
+      key:   '/workflow/designer',
+      icon:  <ApartmentOutlined />,
+      label: 'Workflow Designer',
+    },
     ...menuItems.map((item: any) => ({
       key:      item.path,
       icon:     iconMap[item.icon] || <AppstoreOutlined />,
@@ -61,12 +66,6 @@ export default function AppLayout() {
         label: c.label,
       })),
     })),
-    {
-      key:   '/workflow/designer',
-      icon:  <ApartmentOutlined />,
-      label: 'Workflow Designer',
-      // v2
-    },
   ];
 
   const userMenuItems = [
@@ -119,7 +118,7 @@ export default function AppLayout() {
             selectedKeys={[selectedKey]}
             items={sidebarItems}
             onClick={({ key }) => navigate(key)}
-            style={{ borderRight: 0, marginTop: 8 }}
+            style={{ borderRight: 0, marginTop: 8, overflowY: 'auto', height: 'calc(100vh - 56px)' }}
           />
         )}
       </Sider>
