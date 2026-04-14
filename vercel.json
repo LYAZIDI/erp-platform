@@ -1,12 +1,12 @@
 {
   "version": 2,
   "framework": null,
-  "buildCommand": "npm install && npx prisma generate --schema backend/prisma/schema.prisma && npm install --prefix frontend --include=dev && npm run build --prefix frontend",
+  "buildCommand": "npm install --prefix backend --include=dev && npm run db:generate --prefix backend && npm install --prefix frontend --include=dev && npm run build --prefix frontend",
   "outputDirectory": "frontend/dist",
   "functions": {
     "api/index.ts": {
       "maxDuration": 30,
-      "includeFiles": "node_modules/.prisma/**"
+      "includeFiles": "backend/node_modules/.prisma/**"
     }
   },
   "rewrites": [
