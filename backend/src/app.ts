@@ -68,28 +68,15 @@ app.use('/api/ventes/invoices',   invoiceRoutes);
 // Workflow Engine
 app.use('/api/workflow',          workflowRoutes);
 
-// ── Health check + DB test ────────────────────────────────────────────────────
-app.get(['/health', '/api/health'], async (_req, res) => {
-  let dbStatus = 'not tested';
-  let dbError  = null;
-  try {
-    const { PrismaClient } = await import('@prisma/client');
-    const p = new PrismaClient();
-    await p.$queryRaw`SELECT 1`;
-    await p.$disconnect();
-    dbStatus = 'connected';
-  } catch (e: any) {
-    dbStatus = 'error';
-    dbError  = e.message;
-  }
+// ── Health check ────────────────────────────────────────────────────────────
+app.get('/api/health', (_req, res) => {
   res.json({
     status: 'ok',
     env: process.env.NODE_ENV,
-    db:  process.env.DATABASE_URL ? 'configured' : 'MISSING',
-    dbTest: dbStatus,
-    dbError,
+    db: process.env.DATABASE_URL ? 'configured' : 'MISSING',
   });
 });
+app.get('/api/ping', (_req, res) => res.json({ pong: true }));
 
 // ── 404 ───────────────────────────────────────────────────────────────────────
 app.use((_req, res) => res.status(404).json({ error: 'Route introuvable' }));
