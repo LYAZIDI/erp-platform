@@ -52,31 +52,31 @@ app.use(cors({
 app.use(express.json());
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 
-// ── Routes ────────────────────────────────────────────────────────────────────
-app.use('/api/auth',              authRoutes);
-app.use('/api/users',             userRoutes);
-app.use('/api/roles',             roleRoutes);
-app.use('/api/modules',           moduleRoutes);
+// ── Routes (sans préfixe /api — Vercel le strip avant de passer à Express) ──
+app.use('/auth',              authRoutes);
+app.use('/users',             userRoutes);
+app.use('/roles',             roleRoutes);
+app.use('/modules',           moduleRoutes);
 // CRM
-app.use('/api/crm/contacts',      contactRoutes);
-app.use('/api/crm',               pipelineRoutes);
+app.use('/crm/contacts',      contactRoutes);
+app.use('/crm',               pipelineRoutes);
 // Ventes
-app.use('/api/ventes/products',   productRoutes);
-app.use('/api/ventes/quotes',     quoteRoutes);
-app.use('/api/ventes/orders',     orderRoutes);
-app.use('/api/ventes/invoices',   invoiceRoutes);
+app.use('/ventes/products',   productRoutes);
+app.use('/ventes/quotes',     quoteRoutes);
+app.use('/ventes/orders',     orderRoutes);
+app.use('/ventes/invoices',   invoiceRoutes);
 // Workflow Engine
-app.use('/api/workflow',          workflowRoutes);
+app.use('/workflow',          workflowRoutes);
 
 // ── Health check ────────────────────────────────────────────────────────────
-app.get('/api/health', (_req, res) => {
+app.get(['/health', '/api/health'], (_req, res) => {
   res.json({
     status: 'ok',
     env: process.env.NODE_ENV,
     db: process.env.DATABASE_URL ? 'configured' : 'MISSING',
   });
 });
-app.get('/api/ping', (_req, res) => res.json({ pong: true }));
+app.get('/ping', (_req, res) => res.json({ pong: true }));
 
 // ── 404 ───────────────────────────────────────────────────────────────────────
 app.use((req, res) => res.status(404).json({ error: 'Route introuvable', path: req.path, url: req.url, method: req.method }));
